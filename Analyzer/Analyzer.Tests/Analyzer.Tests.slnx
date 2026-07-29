@@ -1,4 +1,4 @@
 <Solution>
+  <Project Path="../Analyzer/Analyzer.csproj" />
   <Project Path="Analyzer.Tests/Analyzer.Tests.csproj" />
-  <Project Path="Analyzer/Analyzer.csproj" />
 </Solution>

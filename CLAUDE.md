@@ -76,7 +76,7 @@ Do not document planned behavior as implemented behavior. Check the current code
 5. Build the solution and run the relevant tests before proposing the change as complete.
 6. Review the diff and remove unrelated changes before committing.
 7. Always ask the user whether they want to see the diff before creating a commit, and wait for their answer.
-8. Commit changes with a concise, descriptive message.
+8. Commit changes with a concise, descriptive message. Never add attribution or watermark lines to commit messages, PR descriptions, issues, comments, or any other written output (for example `Co-Authored-By: Claude ...` or `Generated with Claude Code`).
 9. Push the task branch and create a Pull Request targeting `main`.
 10. Include the related GitHub Issue in the PR description, preferably using `Closes #ISSUE_NUMBER` when the PR fully resolves the Issue.
 11. Summarize the implementation, tests performed, and any known limitations in the PR description.

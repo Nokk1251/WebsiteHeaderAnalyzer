@@ -1,4 +1,6 @@
-﻿namespace Analyzer.Tests
+﻿using System.Net;
+
+namespace Analyzer.Tests
 {
     public class UrlValidatorTests
     {
@@ -91,6 +93,33 @@
             Assert.True(result.IsValid);
             Assert.Equal("HTTPS://EXAMPLE.COM", result.TrimmedUrl);
             Assert.Equal("The URL is valid.", result.Message);
+        }
+
+        [Fact]
+        public void HttpAnalysisResult_StoresProvidedValues()
+        {
+            bool success = true;
+            var initialUri = new Uri("https://example.com");
+            var finalUri = new Uri("https://example.com");
+            HttpStatusCode statusCode = HttpStatusCode.OK;
+            var headers = new Dictionary<string, string[]>
+            {
+                {"Server", new[]{ "example" } }
+            };
+            bool redirected = false;
+            int redirectCount = 0;
+            string? errorMessage = null;
+
+            var analysis = new HttpAnalysisResult(success, initialUri, finalUri, statusCode, headers, redirected, redirectCount, errorMessage);
+
+            Assert.Equal(success, analysis.Success);
+            Assert.Equal(initialUri, analysis.InitialUri);
+            Assert.Equal(finalUri, analysis.FinalUri);
+            Assert.Equal(statusCode, analysis.StatusCode);
+            Assert.Equal(headers, analysis.Headers);
+            Assert.Equal(redirected, analysis.Redirected);
+            Assert.Equal(redirectCount, analysis.RedirectCount);
+            Assert.Equal(errorMessage, analysis.ErrorMessage);
         }
     }
 }

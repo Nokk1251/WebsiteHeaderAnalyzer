@@ -17,44 +17,20 @@ namespace Analyzer
             HttpMessageHandler handler = _handler ?? new HttpClientHandler { AllowAutoRedirect = false };
 
             using HttpClient client = new HttpClient(handler, disposeHandler: ownsHandler);
-            Uri currentUri = input;
-            bool redirected = false;
-            int redirectedCount = 0;
-            int maxRedirects = 10;
             client.Timeout = TimeSpan.FromSeconds(5);
 
             try
             {
-                while (true)
+                // Redirects are not followed yet; any received response is reported as-is.
+                using HttpResponseMessage response = await client.GetAsync(input);
+                Dictionary<string, string[]> headers = new Dictionary<string, string[]>();
+
+                foreach (var header in response.Headers)
                 {
-                    using HttpResponseMessage response = await client.GetAsync(currentUri);
-                    var statusCode = response.StatusCode;
-                    Dictionary<string, string[]> headers = new Dictionary<string, string[]>();
-
-                    bool isRedirect = statusCode == HttpStatusCode.MovedPermanently || statusCode == HttpStatusCode.Redirect ||
-                        statusCode == HttpStatusCode.RedirectMethod || statusCode == HttpStatusCode.TemporaryRedirect || statusCode == HttpStatusCode.PermanentRedirect;
-
-                    currentUri = new Uri(currentUri, response.Headers.Location);
-
-
-                    if (!isRedirect) 
-                    {
-
-                    }
-
-
-                    foreach (var header in response.Headers)
-                    {
-                        headers.Add(header.Key, header.Value.ToArray());
-                    }
-
-                    return new HttpAnalysisResult(true, input, input, statusCode, headers, false, 0, null);
-
-                    
+                    headers.Add(header.Key, header.Value.ToArray());
                 }
-                
 
-
+                return new HttpAnalysisResult(true, input, input, response.StatusCode, headers, false, 0, null);
             }
             catch(HttpRequestException ex)
             {

@@ -409,7 +409,8 @@ namespace Analyzer.Tests
 
             Assert.True(result.Success);
             Assert.NotNull(result.Headers);
-            Assert.Empty(result.Headers);
+            // HttpClient substitutes empty content, which only adds Content-Length: 0.
+            Assert.All(result.Headers.Keys, key => Assert.Equal("Content-Length", key));
         }
 
         [Fact]
@@ -429,6 +430,8 @@ namespace Analyzer.Tests
 
             Assert.True(result.Headers.ContainsKey("X-Final-Only"));
             Assert.False(result.Headers.ContainsKey("X-Redirect-Only"));
+        }
+
         private static HttpAnalyzer CreateRedirectingAnalyzer(string fromScheme, string toUrl) =>
             new HttpAnalyzer(new FakeHttpMessageHandler(request => Task.FromResult(request.RequestUri!.Scheme == fromScheme
                 ? Redirect(HttpStatusCode.MovedPermanently, toUrl)

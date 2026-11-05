@@ -98,26 +98,170 @@ namespace Analyzer.Tests
             Assert.True(result.Success);
         }
 
-        [Fact]
-        public async Task Analyze_RedirectResponse_IsReportedAsReceivedAndNotFollowed()
+        private static HttpResponseMessage Redirect(HttpStatusCode status, string? location)
         {
-            var handler = new FakeHttpMessageHandler(_ =>
+            var response = new HttpResponseMessage(status);
+            if (location is not null)
             {
-                var response = new HttpResponseMessage(HttpStatusCode.Found);
-                response.Headers.Location = new Uri("https://example.com/other");
-                return Task.FromResult(response);
-            });
+                response.Headers.Location = new Uri(location, UriKind.RelativeOrAbsolute);
+            }
+            return response;
+        }
+
+        [Theory]
+        [InlineData(HttpStatusCode.MovedPermanently)]
+        [InlineData(HttpStatusCode.Found)]
+        [InlineData(HttpStatusCode.SeeOther)]
+        [InlineData(HttpStatusCode.TemporaryRedirect)]
+        [InlineData(HttpStatusCode.PermanentRedirect)]
+        public async Task Analyze_SingleRedirect_IsFollowedAndFinalUriReported(HttpStatusCode redirectStatus)
+        {
+            var handler = new FakeHttpMessageHandler(request =>
+                Task.FromResult(request.RequestUri!.AbsolutePath == "/"
+                    ? Redirect(redirectStatus, "https://example.com/other")
+                    : new HttpResponseMessage(HttpStatusCode.OK)));
             var analyzer = new HttpAnalyzer(handler);
-            var uri = new Uri("https://example.com");
+            var uri = new Uri("https://example.com/");
 
             var result = await analyzer.Analyze(uri);
 
             Assert.True(result.Success);
-            Assert.Equal(HttpStatusCode.Found, result.StatusCode);
-            Assert.Equal(uri, result.FinalUri);
+            Assert.Equal(HttpStatusCode.OK, result.StatusCode);
+            Assert.Equal(uri, result.InitialUri);
+            Assert.Equal(new Uri("https://example.com/other"), result.FinalUri);
+            Assert.True(result.Redirected);
+            Assert.Equal(1, result.RedirectCount);
+            Assert.Equal(2, handler.CallCount);
+        }
+
+        [Fact]
+        public async Task Analyze_MultipleRedirects_AreCountedAndFinalUriReported()
+        {
+            var handler = new FakeHttpMessageHandler(request => Task.FromResult(request.RequestUri!.AbsolutePath switch
+            {
+                "/a" => Redirect(HttpStatusCode.MovedPermanently, "/b"),
+                "/b" => Redirect(HttpStatusCode.Found, "https://other.example.com/c"),
+                _ => new HttpResponseMessage(HttpStatusCode.OK)
+            }));
+            var analyzer = new HttpAnalyzer(handler);
+
+            var result = await analyzer.Analyze(new Uri("https://example.com/a"));
+
+            Assert.True(result.Success);
+            Assert.Equal(new Uri("https://example.com/a"), result.InitialUri);
+            Assert.Equal(new Uri("https://other.example.com/c"), result.FinalUri);
+            Assert.True(result.Redirected);
+            Assert.Equal(2, result.RedirectCount);
+        }
+
+        [Fact]
+        public async Task Analyze_RelativeLocation_IsResolvedAgainstCurrentUri()
+        {
+            var handler = new FakeHttpMessageHandler(request => Task.FromResult(request.RequestUri!.AbsolutePath == "/dir/start"
+                ? Redirect(HttpStatusCode.Found, "next")
+                : new HttpResponseMessage(HttpStatusCode.OK)));
+            var analyzer = new HttpAnalyzer(handler);
+
+            var result = await analyzer.Analyze(new Uri("https://example.com/dir/start"));
+
+            Assert.True(result.Success);
+            Assert.Equal(new Uri("https://example.com/dir/next"), result.FinalUri);
+        }
+
+        [Fact]
+        public async Task Analyze_RedirectFromHttpToHttps_ReportsHttpsFinalUri()
+        {
+            var handler = new FakeHttpMessageHandler(request => Task.FromResult(request.RequestUri!.Scheme == "http"
+                ? Redirect(HttpStatusCode.MovedPermanently, "https://example.com/")
+                : new HttpResponseMessage(HttpStatusCode.OK)));
+            var analyzer = new HttpAnalyzer(handler);
+
+            var result = await analyzer.Analyze(new Uri("http://example.com/"));
+
+            Assert.Equal("http", result.InitialUri.Scheme);
+            Assert.Equal("https", result.FinalUri!.Scheme);
+        }
+
+        [Fact]
+        public async Task Analyze_RedirectResponseWithoutLocation_ReturnsFailure()
+        {
+            var handler = new FakeHttpMessageHandler(_ => Task.FromResult(Redirect(HttpStatusCode.Found, null)));
+            var analyzer = new HttpAnalyzer(handler);
+
+            var result = await analyzer.Analyze(new Uri("https://example.com"));
+
+            Assert.False(result.Success);
+            Assert.Null(result.StatusCode);
+            Assert.Null(result.FinalUri);
+            Assert.Empty(result.Headers);
             Assert.False(result.Redirected);
             Assert.Equal(0, result.RedirectCount);
+            Assert.False(string.IsNullOrWhiteSpace(result.ErrorMessage));
             Assert.Equal(1, handler.CallCount);
+        }
+
+        [Theory]
+        [InlineData("ftp://example.com/file")]
+        [InlineData("mailto:user@example.com")]
+        public async Task Analyze_RedirectToUnsupportedScheme_ReturnsFailureWithoutFollowing(string location)
+        {
+            var handler = new FakeHttpMessageHandler(_ => Task.FromResult(Redirect(HttpStatusCode.Found, location)));
+            var analyzer = new HttpAnalyzer(handler);
+
+            var result = await analyzer.Analyze(new Uri("https://example.com"));
+
+            Assert.False(result.Success);
+            Assert.False(result.Redirected);
+            Assert.Equal(0, result.RedirectCount);
+            Assert.False(string.IsNullOrWhiteSpace(result.ErrorMessage));
+            Assert.Equal(1, handler.CallCount);
+        }
+
+        [Fact]
+        public async Task Analyze_RedirectLoop_StopsAtLimitAndReturnsFailure()
+        {
+            var handler = new FakeHttpMessageHandler(_ => Task.FromResult(Redirect(HttpStatusCode.Found, "https://example.com/loop")));
+            var analyzer = new HttpAnalyzer(handler);
+
+            var result = await analyzer.Analyze(new Uri("https://example.com/loop"));
+
+            Assert.False(result.Success);
+            Assert.Null(result.FinalUri);
+            Assert.Equal(10, result.RedirectCount);
+            Assert.Equal(11, handler.CallCount);
+            Assert.False(string.IsNullOrWhiteSpace(result.ErrorMessage));
+        }
+
+        [Fact]
+        public async Task Analyze_TenRedirects_AreAllowed()
+        {
+            var result = await AnalyzeChainOfRedirects(10);
+
+            Assert.True(result.Success);
+            Assert.Equal(10, result.RedirectCount);
+            Assert.Equal(new Uri("https://example.com/10"), result.FinalUri);
+        }
+
+        [Fact]
+        public async Task Analyze_ElevenRedirects_ExceedLimitAndReturnFailure()
+        {
+            var result = await AnalyzeChainOfRedirects(11);
+
+            Assert.False(result.Success);
+            Assert.Equal(10, result.RedirectCount);
+        }
+
+        // /0 redirects to /1, ..., /(n-1) redirects to /n, and /n returns 200.
+        private static Task<HttpAnalysisResult> AnalyzeChainOfRedirects(int redirects)
+        {
+            var handler = new FakeHttpMessageHandler(request =>
+            {
+                int step = int.Parse(request.RequestUri!.AbsolutePath.TrimStart('/'));
+                return Task.FromResult(step < redirects
+                    ? Redirect(HttpStatusCode.Found, $"/{step + 1}")
+                    : new HttpResponseMessage(HttpStatusCode.OK));
+            });
+            return new HttpAnalyzer(handler).Analyze(new Uri("https://example.com/0"));
         }
 
         [Fact]

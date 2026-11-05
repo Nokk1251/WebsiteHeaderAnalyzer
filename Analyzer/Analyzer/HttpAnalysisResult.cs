@@ -14,6 +14,15 @@ namespace Analyzer
         public int RedirectCount { get; }
         public string? ErrorMessage { get; }
 
+        // Based on the final URL only; null when there is no final URL, so no HTTPS claim is made.
+        public bool? UsesHttps => FinalUri is null ? null : FinalUri.Scheme == Uri.UriSchemeHttps;
+
+        // True when the request started on https but the final destination is plain http.
+        public bool HttpsDowngraded =>
+            FinalUri is not null
+            && InitialUri.Scheme == Uri.UriSchemeHttps
+            && FinalUri.Scheme == Uri.UriSchemeHttp;
+
         public HttpAnalysisResult(bool success, Uri initialUri, Uri? finalUri, HttpStatusCode? statusCode,
             Dictionary<string, string[]> headers, bool redirected, int redirectCount, string? errorMessage)
         {

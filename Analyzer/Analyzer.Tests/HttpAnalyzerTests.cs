@@ -1,4 +1,4 @@
-using System.Net;
+﻿using System.Net;
 
 namespace Analyzer.Tests
 {
@@ -429,6 +429,59 @@ namespace Analyzer.Tests
 
             Assert.True(result.Headers.ContainsKey("X-Final-Only"));
             Assert.False(result.Headers.ContainsKey("X-Redirect-Only"));
+        private static HttpAnalyzer CreateRedirectingAnalyzer(string fromScheme, string toUrl) =>
+            new HttpAnalyzer(new FakeHttpMessageHandler(request => Task.FromResult(request.RequestUri!.Scheme == fromScheme
+                ? Redirect(HttpStatusCode.MovedPermanently, toUrl)
+                : new HttpResponseMessage(HttpStatusCode.OK))));
+
+        [Fact]
+        public async Task Analyze_HttpsWithoutRedirect_UsesHttpsAndIsNotDowngraded()
+        {
+            var analyzer = new HttpAnalyzer(new FakeHttpMessageHandler(_ => Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK))));
+
+            var result = await analyzer.Analyze(new Uri("https://example.com/"));
+
+            Assert.True(result.UsesHttps);
+            Assert.False(result.HttpsDowngraded);
+        }
+
+        [Fact]
+        public async Task Analyze_PlainHttpWithoutRedirect_DoesNotUseHttpsAndIsNotDowngraded()
+        {
+            var analyzer = new HttpAnalyzer(new FakeHttpMessageHandler(_ => Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK))));
+
+            var result = await analyzer.Analyze(new Uri("http://example.com/"));
+
+            Assert.False(result.UsesHttps);
+            Assert.False(result.HttpsDowngraded);
+        }
+
+        [Fact]
+        public async Task Analyze_RedirectFromHttpToHttps_UsesHttpsAndIsNotDowngraded()
+        {
+            var result = await CreateRedirectingAnalyzer("http", "https://example.com/").Analyze(new Uri("http://example.com/"));
+
+            Assert.True(result.UsesHttps);
+            Assert.False(result.HttpsDowngraded);
+        }
+
+        [Fact]
+        public async Task Analyze_RedirectFromHttpsToHttp_DoesNotUseHttpsAndIsDowngraded()
+        {
+            var result = await CreateRedirectingAnalyzer("https", "http://example.com/").Analyze(new Uri("https://example.com/"));
+
+            Assert.False(result.UsesHttps);
+            Assert.True(result.HttpsDowngraded);
+        }
+
+        [Fact]
+        public async Task Analyze_FailureWithoutFinalUri_MakesNoHttpsClaim()
+        {
+            var result = await new HttpAnalyzer(CreateFailingHandler()).Analyze(new Uri("https://example.com/"));
+
+            Assert.False(result.Success);
+            Assert.Null(result.UsesHttps);
+            Assert.False(result.HttpsDowngraded);
         }
 
         [Fact]

@@ -47,7 +47,8 @@ namespace Analyzer.Tests
             Assert.Null(result.StatusCode);
             Assert.NotNull(result.Headers);
             Assert.Empty(result.Headers);
-            Assert.Equal("Simulated network failure", result.ErrorMessage);
+            Assert.False(string.IsNullOrWhiteSpace(result.ErrorMessage));
+            Assert.DoesNotContain("Simulated network failure", result.ErrorMessage);
         }
 
         [Fact]
@@ -262,6 +263,172 @@ namespace Analyzer.Tests
                     : new HttpResponseMessage(HttpStatusCode.OK));
             });
             return new HttpAnalyzer(handler).Analyze(new Uri("https://example.com/0"));
+        }
+
+        private static void AssertFailureShape(HttpAnalysisResult result)
+        {
+            Assert.False(result.Success);
+            Assert.Null(result.StatusCode);
+            Assert.NotNull(result.Headers);
+            Assert.Empty(result.Headers);
+            Assert.False(string.IsNullOrWhiteSpace(result.ErrorMessage));
+        }
+
+        [Theory]
+        [InlineData(HttpRequestError.NameResolutionError, "could not be found")]
+        [InlineData(HttpRequestError.ConnectionError, "Could not connect")]
+        [InlineData(HttpRequestError.SecureConnectionError, "TLS")]
+        [InlineData(HttpRequestError.Unknown, "network error")]
+        public async Task Analyze_NetworkFailure_ReturnsFriendlyMessageWithoutInternalDetails(HttpRequestError error, string expectedFragment)
+        {
+            var handler = new FakeHttpMessageHandler(_ =>
+                throw new HttpRequestException(error, "internal diagnostic details"));
+            var analyzer = new HttpAnalyzer(handler);
+
+            var result = await analyzer.Analyze(new Uri("https://example.com"));
+
+            AssertFailureShape(result);
+            Assert.Contains(expectedFragment, result.ErrorMessage);
+            Assert.DoesNotContain("internal diagnostic details", result.ErrorMessage);
+        }
+
+        [Fact]
+        public async Task Analyze_Timeout_ReturnsTimeoutFailure()
+        {
+            var handler = new FakeHttpMessageHandler(_ => throw new TaskCanceledException("simulated timeout"));
+            var analyzer = new HttpAnalyzer(handler);
+
+            var result = await analyzer.Analyze(new Uri("https://example.com"));
+
+            AssertFailureShape(result);
+            Assert.Contains("timed out", result.ErrorMessage);
+            Assert.DoesNotContain("simulated timeout", result.ErrorMessage);
+        }
+
+        [Fact]
+        public async Task Analyze_CallerCancellation_ReturnsCancelledFailureDistinctFromTimeout()
+        {
+            using var cts = new CancellationTokenSource();
+            cts.Cancel();
+            var handler = new FakeHttpMessageHandler(_ => throw new TaskCanceledException());
+            var analyzer = new HttpAnalyzer(handler);
+
+            var result = await analyzer.Analyze(new Uri("https://example.com"), cts.Token);
+
+            AssertFailureShape(result);
+            Assert.Contains("cancelled", result.ErrorMessage);
+            Assert.DoesNotContain("timed out", result.ErrorMessage);
+        }
+
+        [Fact]
+        public async Task Analyze_CancelledWhileRequestInFlight_ReturnsCancelledFailure()
+        {
+            using var cts = new CancellationTokenSource();
+            var handler = new FakeHttpMessageHandler(_ =>
+            {
+                cts.Cancel();
+                throw new TaskCanceledException();
+            });
+            var analyzer = new HttpAnalyzer(handler);
+
+            var result = await analyzer.Analyze(new Uri("https://example.com"), cts.Token);
+
+            AssertFailureShape(result);
+            Assert.Contains("cancelled", result.ErrorMessage);
+        }
+
+        [Fact]
+        public async Task Analyze_NetworkFailureAfterRedirect_KeepsRedirectInformation()
+        {
+            var handler = new FakeHttpMessageHandler(request => request.RequestUri!.AbsolutePath == "/"
+                ? Task.FromResult(Redirect(HttpStatusCode.Found, "/next"))
+                : throw new HttpRequestException(HttpRequestError.ConnectionError));
+            var analyzer = new HttpAnalyzer(handler);
+
+            var result = await analyzer.Analyze(new Uri("https://example.com/"));
+
+            AssertFailureShape(result);
+            Assert.True(result.Redirected);
+            Assert.Equal(1, result.RedirectCount);
+        }
+
+        [Fact]
+        public async Task Analyze_IncludesResponseAndContentHeaders()
+        {
+            var handler = new FakeHttpMessageHandler(_ =>
+            {
+                var response = new HttpResponseMessage(HttpStatusCode.OK) { Content = new StringContent("hi") };
+                response.Headers.TryAddWithoutValidation("X-Frame-Options", "DENY");
+                return Task.FromResult(response);
+            });
+
+            var result = await new HttpAnalyzer(handler).Analyze(new Uri("https://example.com"));
+
+            Assert.Equal(new[] { "DENY" }, result.Headers["X-Frame-Options"]);
+            Assert.Contains("text/plain", result.Headers["Content-Type"][0]);
+        }
+
+        [Fact]
+        public async Task Analyze_HeaderNames_AreCaseInsensitive()
+        {
+            var handler = new FakeHttpMessageHandler(_ =>
+            {
+                var response = new HttpResponseMessage(HttpStatusCode.OK);
+                response.Headers.TryAddWithoutValidation("Strict-Transport-Security", "max-age=1");
+                return Task.FromResult(response);
+            });
+
+            var result = await new HttpAnalyzer(handler).Analyze(new Uri("https://example.com"));
+
+            Assert.True(result.Headers.ContainsKey("strict-transport-security"));
+            Assert.Equal(new[] { "max-age=1" }, result.Headers["STRICT-TRANSPORT-SECURITY"]);
+        }
+
+        [Fact]
+        public async Task Analyze_MultiValueHeader_PreservesAllValues()
+        {
+            var handler = new FakeHttpMessageHandler(_ =>
+            {
+                var response = new HttpResponseMessage(HttpStatusCode.OK);
+                response.Headers.TryAddWithoutValidation("Via", new[] { "1.1 a", "1.1 b" });
+                return Task.FromResult(response);
+            });
+
+            var result = await new HttpAnalyzer(handler).Analyze(new Uri("https://example.com"));
+
+            Assert.Equal(new[] { "1.1 a", "1.1 b" }, result.Headers["Via"]);
+        }
+
+        [Fact]
+        public async Task Analyze_ResponseWithoutContentOrHeaders_ReturnsEmptyNonNullHeaders()
+        {
+            var handler = new FakeHttpMessageHandler(_ =>
+                Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK) { Content = null! }));
+
+            var result = await new HttpAnalyzer(handler).Analyze(new Uri("https://example.com"));
+
+            Assert.True(result.Success);
+            Assert.NotNull(result.Headers);
+            Assert.Empty(result.Headers);
+        }
+
+        [Fact]
+        public async Task Analyze_Headers_AreThoseOfFinalResponseNotRedirects()
+        {
+            var handler = new FakeHttpMessageHandler(request =>
+            {
+                HttpResponseMessage response = request.RequestUri!.AbsolutePath == "/"
+                    ? Redirect(HttpStatusCode.Found, "/final")
+                    : new HttpResponseMessage(HttpStatusCode.OK);
+                response.Headers.TryAddWithoutValidation(
+                    request.RequestUri.AbsolutePath == "/" ? "X-Redirect-Only" : "X-Final-Only", "1");
+                return Task.FromResult(response);
+            });
+
+            var result = await new HttpAnalyzer(handler).Analyze(new Uri("https://example.com/"));
+
+            Assert.True(result.Headers.ContainsKey("X-Final-Only"));
+            Assert.False(result.Headers.ContainsKey("X-Redirect-Only"));
         }
 
         [Fact]

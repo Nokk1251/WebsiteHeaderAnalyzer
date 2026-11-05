@@ -4,6 +4,7 @@ namespace Analyzer
     public class HttpAnalyzer
     {
         private const int MaxRedirects = 10;
+        private const int TimeoutSeconds = 5;
 
         private readonly HttpMessageHandler? _handler;
 
@@ -13,13 +14,13 @@ namespace Analyzer
             _handler = handler;
         }
 
-        public async Task<HttpAnalysisResult> Analyze(Uri input)
+        public async Task<HttpAnalysisResult> Analyze(Uri input, CancellationToken cancellationToken = default)
         {
             bool ownsHandler = _handler is null;
             HttpMessageHandler handler = _handler ?? new HttpClientHandler { AllowAutoRedirect = false };
 
             using HttpClient client = new HttpClient(handler, disposeHandler: ownsHandler);
-            client.Timeout = TimeSpan.FromSeconds(5);
+            client.Timeout = TimeSpan.FromSeconds(TimeoutSeconds);
 
             int redirectCount = 0;
 
@@ -29,16 +30,11 @@ namespace Analyzer
 
                 while (true)
                 {
-                    using HttpResponseMessage response = await client.GetAsync(current);
+                    using HttpResponseMessage response = await client.GetAsync(current, cancellationToken);
 
                     if (!IsRedirectStatus(response.StatusCode))
                     {
-                        Dictionary<string, string[]> headers = new Dictionary<string, string[]>();
-
-                        foreach (var header in response.Headers)
-                        {
-                            headers.Add(header.Key, header.Value.ToArray());
-                        }
+                        Dictionary<string, string[]> headers = CollectHeaders(response);
 
                         return new HttpAnalysisResult(true, input, current, response.StatusCode, headers, redirectCount > 0, redirectCount, null);
                     }
@@ -64,14 +60,47 @@ namespace Analyzer
                     redirectCount++;
                 }
             }
-            catch(HttpRequestException ex)
+            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
             {
-                return new HttpAnalysisResult(false, input, null, null, new Dictionary<string, string[]>(), redirectCount > 0, redirectCount, ex.Message);
+                return Failure(input, redirectCount, "The analysis was cancelled.");
             }
-            catch(OperationCanceledException ex2)
+            catch (OperationCanceledException)
             {
-                return new HttpAnalysisResult(false, input, null, null, new Dictionary<string, string[]>(), redirectCount > 0, redirectCount, $"{ex2.Message}. The operation took more than 5 seconds");
+                // The caller did not cancel, so HttpClient.Timeout expired.
+                return Failure(input, redirectCount, $"The request timed out after {TimeoutSeconds} seconds.");
             }
+            catch (HttpRequestException ex)
+            {
+                return Failure(input, redirectCount, DescribeNetworkError(ex.HttpRequestError));
+            }
+        }
+
+        private static string DescribeNetworkError(HttpRequestError error) => error switch
+        {
+            HttpRequestError.NameResolutionError => "The host could not be found. Check the address and your internet connection.",
+            HttpRequestError.ConnectionError => "Could not connect to the server.",
+            HttpRequestError.SecureConnectionError => "A secure (TLS) connection to the server could not be established.",
+            _ => "A network error occurred while contacting the server."
+        };
+
+        // Response and content headers (e.g. Content-Type) are separate collections; names are case-insensitive.
+        private static Dictionary<string, string[]> CollectHeaders(HttpResponseMessage response)
+        {
+            Dictionary<string, string[]> headers = new Dictionary<string, string[]>(StringComparer.OrdinalIgnoreCase);
+
+            IEnumerable<KeyValuePair<string, IEnumerable<string>>> all = response.Content is null
+                ? response.Headers
+                : response.Headers.Concat(response.Content.Headers);
+
+            foreach (var header in all)
+            {
+                string[] values = header.Value.ToArray();
+                headers[header.Key] = headers.TryGetValue(header.Key, out string[]? existing)
+                    ? existing.Concat(values).ToArray()
+                    : values;
+            }
+
+            return headers;
         }
 
         private static bool IsRedirectStatus(HttpStatusCode statusCode) =>

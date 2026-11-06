@@ -99,6 +99,36 @@ namespace Analyzer.Tests
             Assert.Contains(WebUtility.HtmlEncode(ConsoleReport.Disclaimer), html);
         }
 
+        [Fact]
+        public void Pages_HaveNoScriptsOrExternalResources_AndSupportResponsiveDarkLayout()
+        {
+            string form = WebPage.RenderForm();
+            string report = Render(Success("https://example.com/", "https://example.com/"));
+
+            foreach (string html in new[] { form, report })
+            {
+                Assert.DoesNotContain("<script", html);
+                Assert.DoesNotContain("src=", html);
+                Assert.DoesNotContain("http-equiv", html);
+                Assert.DoesNotContain("@import", html);
+                Assert.DoesNotContain("url(", html);
+                Assert.DoesNotContain("<link", html);
+                Assert.Contains("name=\"viewport\"", html);
+                Assert.Contains("prefers-color-scheme:dark", html);
+            }
+        }
+
+        [Fact]
+        public void RenderReport_ShowsPresentAndMissingAsBadges()
+        {
+            var headers = new Dictionary<string, string[]> { ["X-Frame-Options"] = new[] { "DENY" } };
+
+            string html = Render(Success("https://example.com/", "https://example.com/", headers));
+
+            Assert.Single(System.Text.RegularExpressions.Regex.Matches(html, "badge ok\">present"));
+            Assert.Equal(5, System.Text.RegularExpressions.Regex.Matches(html, "badge miss\">missing").Count);
+        }
+
         // --- WebServer.HandleAsync (no sockets) ---
 
         [Fact]
@@ -124,7 +154,7 @@ namespace Analyzer.Tests
             var (status, html) = await WebServer.HandleAsync("/", url, new HttpAnalyzer(handler));
 
             Assert.Equal(400, status);
-            Assert.Contains("class=\"error\"", html);
+            Assert.Contains("class=\"alert\"", html);
             Assert.Equal(0, handler.CallCount);
         }
 

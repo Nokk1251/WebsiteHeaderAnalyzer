@@ -1,3 +1,5 @@
+using System.ComponentModel;
+using System.Diagnostics;
 using System.Net;
 using System.Text;
 
@@ -42,7 +44,7 @@ namespace Analyzer
         }
 
         public static async Task<int> RunAsync(int port, HttpAnalyzer httpAnalyzer, TextWriter output,
-            CancellationToken cancellationToken)
+            CancellationToken cancellationToken, bool openBrowser = false)
         {
             using HttpListener listener = new HttpListener();
             listener.Prefixes.Add($"http://localhost:{port}/");
@@ -58,6 +60,11 @@ namespace Analyzer
             }
 
             output.WriteLine($"Web interface running at http://localhost:{port}/ (press Ctrl+C to stop).");
+
+            if (openBrowser)
+            {
+                TryOpenBrowser($"http://localhost:{port}/", output);
+            }
 
             using CancellationTokenRegistration registration = cancellationToken.Register(listener.Stop);
 
@@ -77,6 +84,19 @@ namespace Analyzer
             }
 
             return 0;
+        }
+
+        // A missing or failing browser must not stop the server, so the failure is reported and ignored.
+        private static void TryOpenBrowser(string url, TextWriter output)
+        {
+            try
+            {
+                using Process? process = Process.Start(new ProcessStartInfo(url) { UseShellExecute = true });
+            }
+            catch (Exception ex) when (ex is Win32Exception or InvalidOperationException or PlatformNotSupportedException)
+            {
+                output.WriteLine("Could not open the browser automatically. Open the address above manually.");
+            }
         }
 
         private static async Task RespondAsync(HttpListenerContext context, HttpAnalyzer httpAnalyzer,

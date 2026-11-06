@@ -1,11 +1,11 @@
 ﻿using Analyzer;
 
-// "--web [port]" starts the local web interface; without it the console flow runs.
+// "--web [port] [--no-browser]" starts the local web interface; without --web the console flow runs.
 if (args.Contains("--web"))
 {
     int port = WebServer.DefaultPort;
     int portIndex = Array.IndexOf(args, "--web") + 1;
-    if (portIndex < args.Length && !int.TryParse(args[portIndex], out port))
+    if (portIndex < args.Length && !args[portIndex].StartsWith("--") && !int.TryParse(args[portIndex], out port))
     {
         Console.Error.WriteLine("The port must be a number, for example: --web 5080");
         return 1;
@@ -18,7 +18,8 @@ if (args.Contains("--web"))
         cts.Cancel();
     };
 
-    return await WebServer.RunAsync(port, new HttpAnalyzer(), Console.Out, cts.Token);
+    bool openBrowser = !args.Contains("--no-browser");
+    return await WebServer.RunAsync(port, new HttpAnalyzer(), Console.Out, cts.Token, openBrowser);
 }
 
 return await ConsoleApp.RunAsync(Console.In, Console.Out, Console.Error, new HttpAnalyzer());

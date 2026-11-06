@@ -1,5 +1,7 @@
 # Website Security Header Analyzer
 
+[![CI](https://github.com/Nokk1251/WebsiteHeaderAnalyzer/actions/workflows/ci.yml/badge.svg)](https://github.com/Nokk1251/WebsiteHeaderAnalyzer/actions/workflows/ci.yml)
+
 Образователен C#/.NET конзолен инструмент, който извършва **пасивна** проверка на уебсайт: използва ли HTTPS и кои избрани HTTP security хедъри присъстват в отговора.
 
 > **Статус: проектът е в процес на разработка.** Реализирана е валидацията на URL. HTTP анализът е започнат, но още не е завършен и не е свързан с конзолното приложение (вижте [Статус на функционалностите](#статус-на-функционалностите)).

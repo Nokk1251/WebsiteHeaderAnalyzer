@@ -45,7 +45,7 @@ namespace Analyzer
             return report.ToString();
         }
 
-        private static string DescribeHttps(HttpAnalysisResult result)
+        public static string DescribeHttps(HttpAnalysisResult result)
         {
             if (result.HttpsDowngraded)
             {

@@ -1,0 +1,11 @@
+{
+  "profiles": {
+    "Web interface": {
+      "commandName": "Project",
+      "commandLineArgs": "--web"
+    },
+    "Console": {
+      "commandName": "Project"
+    }
+  }
+}

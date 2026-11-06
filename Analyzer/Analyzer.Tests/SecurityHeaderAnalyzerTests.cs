@@ -8,6 +8,32 @@ namespace Analyzer.Tests
             Assert.Single(observations, o => o.Name == name);
 
         [Fact]
+        public void Definitions_EveryCheckedHeaderHasNonEmptyPurposeAndLimitation()
+        {
+            Assert.Equal(6, SecurityHeaderAnalyzer.Definitions.Count);
+            Assert.All(SecurityHeaderAnalyzer.Definitions, d =>
+            {
+                Assert.False(string.IsNullOrWhiteSpace(d.Name));
+                Assert.False(string.IsNullOrWhiteSpace(d.Purpose));
+                Assert.False(string.IsNullOrWhiteSpace(d.Limitation));
+            });
+        }
+
+        [Fact]
+        public void Analyze_Observations_CarryPurposeAndLimitationWhetherPresentOrMissing()
+        {
+            var headers = new Dictionary<string, string[]> { ["X-Frame-Options"] = new[] { "DENY" } };
+
+            var result = Analyzer.Analyze(headers);
+
+            Assert.All(result, o =>
+            {
+                Assert.False(string.IsNullOrWhiteSpace(o.Purpose));
+                Assert.False(string.IsNullOrWhiteSpace(o.Limitation));
+            });
+        }
+
+        [Fact]
         public void Analyze_AllHeadersPresent_ReportsEachAsPresentWithValue()
         {
             var headers = SecurityHeaderAnalyzer.CheckedHeaders

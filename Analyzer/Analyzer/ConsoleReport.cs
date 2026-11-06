@@ -36,6 +36,8 @@ namespace Analyzer
                 report.AppendLine(observation.IsPresent
                     ? $"  [present] {observation.Name}: {FormatValues(observation.Values)}"
                     : $"  [missing] {observation.Name}");
+                report.AppendLine($"      Purpose: {observation.Purpose}");
+                report.AppendLine($"      Limitation: {observation.Limitation}");
             }
 
             report.AppendLine();

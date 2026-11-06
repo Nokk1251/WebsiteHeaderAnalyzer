@@ -91,6 +91,33 @@ namespace Analyzer.Tests
         }
 
         [Fact]
+        public void Build_Success_ShowsPurposeAndLimitationForEveryHeaderWhetherPresentOrMissing()
+        {
+            var headers = new Dictionary<string, string[]> { ["X-Frame-Options"] = new[] { "DENY" } };
+            var result = Success("https://example.com/", "https://example.com/", headers: headers);
+
+            string report = BuildReport(result);
+
+            foreach (SecurityHeaderDefinition definition in SecurityHeaderAnalyzer.Definitions)
+            {
+                Assert.Contains($"Purpose: {definition.Purpose}", report);
+                Assert.Contains($"Limitation: {definition.Limitation}", report);
+            }
+        }
+
+        [Fact]
+        public void Build_Failure_DoesNotShowHeaderDescriptions()
+        {
+            var result = new HttpAnalysisResult(false, new Uri("https://example.com/"), null, null,
+                new Dictionary<string, string[]>(), false, 0, "Could not connect to the server.");
+
+            string report = BuildReport(result);
+
+            Assert.DoesNotContain("Purpose:", report);
+            Assert.DoesNotContain("Limitation:", report);
+        }
+
+        [Fact]
         public void Build_MultiValueHeader_JoinsAllValues()
         {
             var headers = new Dictionary<string, string[]>

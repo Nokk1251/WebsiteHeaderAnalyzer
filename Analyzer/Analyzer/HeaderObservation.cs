@@ -4,7 +4,11 @@ namespace Analyzer
     // Findings describe present values; Recommendation is only set for a missing header.
     public record HeaderObservation(string Name, bool IsPresent, IReadOnlyList<string> Values, string Purpose, string Limitation)
     {
-        public IReadOnlyList<string> Findings { get; init; } = Array.Empty<string>();
+        public IReadOnlyList<HeaderFinding> FindingDetails { get; init; } = Array.Empty<HeaderFinding>();
+
+        public IReadOnlyList<string> Findings => FindingDetails.Select(f => f.Text).ToArray();
+
+        public bool NeedsAttention => FindingDetails.Any(f => f.NeedsAttention);
 
         public string? Recommendation { get; init; }
     }

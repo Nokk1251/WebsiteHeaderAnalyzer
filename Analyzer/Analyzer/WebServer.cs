@@ -43,6 +43,36 @@ namespace Analyzer
             }
         }
 
+        // JSON export of the same report; errors are returned as a small JSON object.
+        public static async Task<(int StatusCode, string Json)> HandleJsonAsync(string path, string? urlParameter,
+            HttpAnalyzer httpAnalyzer, CancellationToken cancellationToken = default)
+        {
+            if (path != "/")
+            {
+                return (404, ErrorJson("Page not found."));
+            }
+
+            ValidationResult validation = new UrlValidator().Validate(urlParameter);
+            if (!validation.IsValid)
+            {
+                return (400, ErrorJson(validation.Message));
+            }
+
+            try
+            {
+                HttpAnalysisResult result = await httpAnalyzer.Analyze(new Uri(validation.TrimmedUrl), cancellationToken);
+                IReadOnlyList<HeaderObservation> observations = new SecurityHeaderAnalyzer().Analyze(result.Headers);
+                return (200, ReportJson.Build(result, observations));
+            }
+            catch (Exception ex) when (ex is not OperationCanceledException)
+            {
+                return (500, ErrorJson("An unexpected error occurred during the analysis."));
+            }
+        }
+
+        private static string ErrorJson(string message) =>
+            System.Text.Json.JsonSerializer.Serialize(new { error = message });
+
         public static async Task<int> RunAsync(int port, HttpAnalyzer httpAnalyzer, TextWriter output,
             CancellationToken cancellationToken, bool openBrowser = false)
         {
@@ -106,6 +136,7 @@ namespace Analyzer
             {
                 int status;
                 string html;
+                bool isJson = false;
 
                 if (context.Request.HttpMethod != "GET")
                 {
@@ -115,12 +146,25 @@ namespace Analyzer
                 else
                 {
                     string? url = context.Request.QueryString["url"];
-                    (status, html) = await HandleAsync(context.Request.Url?.AbsolutePath ?? "/", url, httpAnalyzer, cancellationToken);
+                    string path = context.Request.Url?.AbsolutePath ?? "/";
+                    if (context.Request.QueryString["format"] == "json")
+                    {
+                        (status, html) = await HandleJsonAsync(path, url, httpAnalyzer, cancellationToken);
+                        isJson = true;
+                    }
+                    else
+                    {
+                        (status, html) = await HandleAsync(path, url, httpAnalyzer, cancellationToken);
+                    }
                 }
 
                 byte[] bytes = Encoding.UTF8.GetBytes(html);
                 context.Response.StatusCode = status;
-                context.Response.ContentType = "text/html; charset=utf-8";
+                context.Response.ContentType = isJson ? "application/json; charset=utf-8" : "text/html; charset=utf-8";
+                if (isJson && status == 200)
+                {
+                    context.Response.Headers["Content-Disposition"] = "attachment; filename=\"report.json\"";
+                }
                 context.Response.Headers["Cache-Control"] = "no-store";
                 context.Response.Headers["X-Content-Type-Options"] = "nosniff";
                 context.Response.Headers["Content-Security-Policy"] = "default-src 'none'; style-src 'unsafe-inline'; form-action 'self'";

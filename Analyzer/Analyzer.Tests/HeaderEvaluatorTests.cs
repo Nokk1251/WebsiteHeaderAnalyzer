@@ -225,7 +225,7 @@ namespace Analyzer.Tests
 
             Assert.Contains("<b>Finding:</b>", html);
             Assert.Contains("<b>Recommendation:</b>", html);
-            Assert.Contains("Coverage: 1 of 6 checked headers are present.", html);
+            Assert.Contains("<div class=\"big\">1<span> / 6</span></div>", html);
             Assert.DoesNotContain("<script>x</script>", html);
         }
     }

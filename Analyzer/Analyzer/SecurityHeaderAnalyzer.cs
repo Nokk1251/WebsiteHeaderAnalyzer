@@ -46,7 +46,11 @@ namespace Analyzer
 
                 bool isPresent = headers.Keys.Any(k => string.Equals(k, definition.Name, StringComparison.OrdinalIgnoreCase));
 
-                observations.Add(new HeaderObservation(definition.Name, isPresent, values, definition.Purpose, definition.Limitation));
+                observations.Add(new HeaderObservation(definition.Name, isPresent, values, definition.Purpose, definition.Limitation)
+                {
+                    Findings = isPresent ? HeaderEvaluator.EvaluateValues(definition.Name, values) : Array.Empty<string>(),
+                    Recommendation = isPresent ? null : HeaderEvaluator.Recommend(definition.Name)
+                });
             }
 
             return observations;

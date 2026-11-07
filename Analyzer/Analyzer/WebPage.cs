@@ -76,6 +76,7 @@ namespace Analyzer
             body.Append("</div></section>");
 
             body.Append("<section class=\"card\"><h2>Security headers (observations)</h2>");
+            body.Append($"<p class=\"note\"><b>{Encode(ConsoleReport.CoverageSummary(observations))}</b></p>");
             foreach (HeaderObservation observation in observations)
             {
                 string badge = observation.IsPresent
@@ -91,6 +92,14 @@ namespace Analyzer
                 }
                 body.Append($"<p class=\"note\"><b>Purpose:</b> {Encode(observation.Purpose)}</p>");
                 body.Append($"<p class=\"note\"><b>Limitation:</b> {Encode(observation.Limitation)}</p>");
+                foreach (string finding in observation.Findings)
+                {
+                    body.Append($"<p class=\"note\"><b>Finding:</b> {Encode(finding)}</p>");
+                }
+                if (observation.Recommendation is not null)
+                {
+                    body.Append($"<p class=\"note\"><b>Recommendation:</b> {Encode(observation.Recommendation)}</p>");
+                }
                 body.Append("</div>");
             }
             body.Append("</section>");

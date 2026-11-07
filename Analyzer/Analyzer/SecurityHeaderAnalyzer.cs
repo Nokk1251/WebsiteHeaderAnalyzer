@@ -48,7 +48,7 @@ namespace Analyzer
 
                 observations.Add(new HeaderObservation(definition.Name, isPresent, values, definition.Purpose, definition.Limitation)
                 {
-                    Findings = isPresent ? HeaderEvaluator.EvaluateValues(definition.Name, values) : Array.Empty<string>(),
+                    FindingDetails = isPresent ? HeaderEvaluator.Evaluate(definition.Name, values) : Array.Empty<HeaderFinding>(),
                     Recommendation = isPresent ? null : HeaderEvaluator.Recommend(definition.Name)
                 });
             }

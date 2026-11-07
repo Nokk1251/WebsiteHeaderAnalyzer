@@ -61,7 +61,7 @@ namespace Analyzer.Tests
             Assert.Contains("https://example.com/", html);
             Assert.Contains("200 OK", html);
             Assert.Contains("Redirects followed", html);
-            Assert.Contains("<code>DENY</code>", html);
+            Assert.Contains(">DENY</code>", html);
             Assert.Contains("missing", html);
             foreach (SecurityHeaderDefinition definition in SecurityHeaderAnalyzer.Definitions)
             {

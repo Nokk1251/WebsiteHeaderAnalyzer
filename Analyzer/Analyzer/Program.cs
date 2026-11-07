@@ -1,6 +1,9 @@
 ﻿using Analyzer;
 
 // "--web [port] [--no-browser]" starts the local web interface; without --web the console flow runs.
+// Local and private addresses are blocked unless "--allow-private" is given.
+HttpAnalyzer httpAnalyzer = new HttpAnalyzer(allowPrivateAddresses: args.Contains("--allow-private"));
+
 if (args.Contains("--web"))
 {
     int port = WebServer.DefaultPort;
@@ -19,7 +22,7 @@ if (args.Contains("--web"))
     };
 
     bool openBrowser = !args.Contains("--no-browser");
-    return await WebServer.RunAsync(port, new HttpAnalyzer(), Console.Out, cts.Token, openBrowser);
+    return await WebServer.RunAsync(port, httpAnalyzer, Console.Out, cts.Token, openBrowser);
 }
 
-return await ConsoleApp.RunAsync(Console.In, Console.Out, Console.Error, new HttpAnalyzer());
+return await ConsoleApp.RunAsync(Console.In, Console.Out, Console.Error, httpAnalyzer);

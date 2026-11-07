@@ -38,12 +38,28 @@ namespace Analyzer
                     : $"  [missing] {ConsoleText.Sanitize(observation.Name)}");
                 report.AppendLine($"      Purpose: {observation.Purpose}");
                 report.AppendLine($"      Limitation: {observation.Limitation}");
+
+                foreach (string finding in observation.Findings)
+                {
+                    report.AppendLine($"      Finding: {ConsoleText.Sanitize(finding)}");
+                }
+
+                if (observation.Recommendation is not null)
+                {
+                    report.AppendLine($"      Recommendation: {observation.Recommendation}");
+                }
             }
 
+            report.AppendLine();
+            report.AppendLine(CoverageSummary(observations));
             report.AppendLine();
             report.AppendLine(Disclaimer);
             return report.ToString();
         }
+
+        // A count of what was observed, not a verdict about the site.
+        public static string CoverageSummary(IReadOnlyList<HeaderObservation> observations) =>
+            $"Coverage: {observations.Count(o => o.IsPresent)} of {observations.Count} checked headers are present.";
 
         public static string DescribeHttps(HttpAnalysisResult result)
         {

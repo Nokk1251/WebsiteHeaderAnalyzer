@@ -1,0 +1,40 @@
+Enter a URL:
+=== Website analysis report ===
+Initial URL: https://github.com/
+Final URL: https://github.com/
+Status code: 200 OK
+Redirects followed: 0
+HTTPS (final URL): Yes
+
+Security headers (observations):
+  [present] Strict-Transport-Security: max-age=31536000; includeSubdomains; preload
+      Purpose: Tells browsers to use HTTPS only when connecting to this site for a period of time.
+      Limitation: It is only honored by browsers over HTTPS and does not show that the rest of the site is configured securely.
+      Finding: max-age is 31536000 seconds (about 365 days).
+      Finding: includeSubDomains is set.
+      Finding: preload is set.
+  [present] Content-Security-Policy: default-src 'none'; base-uri 'self'; child-src github.githubassets.com github.com/assets-cdn/worker/ github.com/assets/ gist.github.com/assets-cdn/worker/; connect-src 'self' uploads.github.com www.githubstatus.com collector.github.com raw.githubusercontent.com api.github.com github-cloud.s3.amazonaws.com github-production-repository-file-5c1aeb.s3.amazonaws.com github-production-upload-manifest-file-7fdce7.s3.amazonaws.com github-production-user-asset-6210df.s3.amazonaws.com *.rel.tunnels.api.visualstudio.com wss://*.rel.tunnels.api.visualstudio.com github.githubassets.com objects-origin.githubusercontent.com copilot-proxy.githubusercontent.com proxy.individual.githubcopilot.com proxy.business.githubcopilot.com proxy.enterprise.githubcopilot.com *.actions.githubusercontent.com wss://*.actions.githubusercontent.com productionresultssa0.blob.core.windows.net productionresultssa1.blob.core.windows.net productionresultssa2.blob.core.windows.net productionresultssa3.blob.core.windows.net productionresultssa4.blob.core.windows.net productionresultssa5.blob.core.windows.net productionresultssa6.blob.core.windows.net productionresultssa7.blob.core.windows.net productionresultssa8.blob.core.windows.net productionresultssa9.blob.core.windows.net productionresultssa10.blob.core.windows.net productionresultssa11.blob.core.windows.net productionresultssa12.blob.core.windows.net productionresultssa13.blob.core.windows.net productionresultssa14.blob.core.windows.net productionresultssa15.blob.core.windows.net productionresultssa16.blob.core.windows.net productionresultssa17.blob.core.windows.net productionresultssa18.blob.core.windows.net productionresultssa19.blob.core.windows.net productionresultssa30.blob.core.windows.net productionresultssa31.blob.core.windows.net productionresultssa32.blob.core.windows.net github-production-repository-image-32fea6.s3.amazonaws.com github-production-release-asset-2e65be.s3.amazonaws.com insights.github.com wss://alive.github.com wss://alive-staging.github.com api.githubcopilot.com api.individual.githubcopilot.com api.business.githubcopilot.com api.enterprise.githubcopilot.com wss://production-copilot-host.webpubsub.azure.com wss://production-copilot-host-centralus.webpubsub.azure.com wss://production-copilot-host-centralus-02.webpubsub.azure.com wss://production-copilot-host-westus.webpubsub.azure.com wss://production-copilot-host-westus3.webpubsub.azure.com api.github.com/cmc_internal/api/ edge.fullstory.com rs.fullstory.com; font-src github.githubassets.com; form-action 'self' github.com gist.github.com copilot-workspace.githubnext.com objects-origin.githubusercontent.com; frame-ancestors 'none'; frame-src viewscreen.githubusercontent.com notebooks.githubusercontent.com www.youtube-nocookie.com; img-src 'self' data: blob: github.githubassets.com media.githubusercontent.com camo.githubusercontent.com identicons.github.com avatars.githubusercontent.com private-avatars.githubusercontent.com github-cloud.s3.amazonaws.com objects.githubusercontent.com release-assets.githubusercontent.com secured-user-images.githubusercontent.com user-images.githubusercontent.com private-user-images.githubusercontent.com opengraph.githubassets.com repository-images.githubusercontent.com marketplace-screenshots.githubusercontent.com copilotprodattachments.blob.core.windows.net/github-production-copilot-attachments/ github-production-user-asset-6210df.s3.amazonaws.com customer-stories-feed.github.com spotlights-feed.github.com explore-feed.github.com *.googleusercontent.com objects-origin.githubusercontent.com *.githubusercontent.com images.ctfassets.net/8aevphvgewt8/; manifest-src 'self'; media-src github.com user-images.githubusercontent.com secured-user-images.githubusercontent.com private-user-images.githubusercontent.com github-production-user-asset-6210df.s3.amazonaws.com gist.github.com github.githubassets.com assets.ctfassets.net/8aevphvgewt8/ videos.ctfassets.net/8aevphvgewt8/; script-src github.githubassets.com 'sha256-6AKuI+cDd1MoUL1u4eqrA9PXmnPAkOB4h7421hPUUm0='; style-src 'unsafe-inline' github.githubassets.com; upgrade-insecure-requests; worker-src github.githubassets.com github.com/assets-cdn/worker/ github.com/assets/ gist.github.com/assets-cdn/worker/
+      Purpose: Lets a site restrict which sources of scripts, styles and other content a browser may load.
+      Limitation: Its presence does not show that the policy is strict enough; a permissive policy gives little protection.
+      Finding: 'unsafe-inline' is present, which allows inline scripts or styles.
+  [present] X-Content-Type-Options: nosniff
+      Purpose: Asks browsers not to guess a response's content type and to use the declared one.
+      Limitation: It only affects content-type sniffing and does not protect against other kinds of issues.
+      Finding: The value is nosniff.
+  [present] X-Frame-Options: deny
+      Purpose: Controls whether the page may be displayed inside a frame on another site.
+      Limitation: It only covers framing; newer sites may use the Content-Security-Policy frame-ancestors directive instead.
+      Finding: Framing is denied (DENY).
+  [present] Referrer-Policy: origin-when-cross-origin, strict-origin-when-cross-origin
+      Purpose: Controls how much of the page address is sent to other sites in the Referer header.
+      Limitation: It only limits referrer information and does not affect other data the site shares.
+      Finding: The policy is strict-origin-when-cross-origin.
+  [missing] Permissions-Policy
+      Purpose: Lets a site allow or block browser features such as camera, microphone or geolocation.
+      Limitation: Its presence does not show which features are actually in use or that the chosen settings are appropriate.
+      Recommendation: Consider adding this header, for example: Permissions-Policy: camera=(), microphone=(), geolocation=() (adjust the value to the needs of the site).
+
+Coverage: 5 of 6 checked headers are present.
+
+Note: this is a passive check of a single response. It is not a security audit, and the presence of a header does not prove that a website is secure.
+

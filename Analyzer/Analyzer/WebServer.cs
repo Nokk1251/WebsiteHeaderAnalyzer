@@ -27,7 +27,7 @@ namespace Analyzer
             ValidationResult validation = new UrlValidator().Validate(urlParameter);
             if (!validation.IsValid)
             {
-                return (400, WebPage.RenderForm(validation.Message, urlParameter));
+                return (400, WebPage.RenderForm(validation.Message, validation.TrimmedUrl));
             }
 
             try
